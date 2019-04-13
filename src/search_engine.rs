@@ -47,9 +47,12 @@ fn strip_metadata(string: &str) -> String {
     lines.join("\n").chars().filter(|&c| c != '-').collect()
 }
 
+/// Return greek string in greeklish.
 fn to_greeklish(string: &str) -> String {
+    // We always replace spaces with underscores. We don't need that for searching, only for
+    // storing the slug, but it also works for searching so we leave it like that for simplicity.
     lazy_static! {
-        static ref RE: Regex = Regex::new(r"[^a-z_]").unwrap();
+        static ref RE: Regex = Regex::new(r"[^a-z_\n]").unwrap();
     }
     string
         .to_lowercase()

@@ -183,6 +183,7 @@ impl SearchEngine {
             let head_parts: Vec<&str> = head.split('\n').collect();
             let (song_name, song_artist) = match head_parts[..] {
                 [song_name, song_artist, _song_url] => (song_name, song_artist),
+                [song_name, song_artist] => (song_name, song_artist),
                 _ => {
                     error!("Invalid song format");
                     std::process::exit(1);

@@ -15,11 +15,11 @@ use crate::search_engine::SearchEngine;
 fn service(
     request: &Request<Body>,
     search_engine: &SearchEngine,
-) -> Box<Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
     fn get_json_response(
         status: StatusCode,
         body: Body,
-    ) -> Box<Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+    ) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
         Box::new(future::ok(
             Response::builder()
                 .header(header::CONTENT_TYPE, "application/json")

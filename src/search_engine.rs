@@ -307,7 +307,9 @@ impl SearchEngine {
 
 #[cfg(test)]
 mod tests {
-    use tantivy::tokenizer::{Language, SimpleTokenizer, Stemmer, TokenStream, Tokenizer};
+    use tantivy::tokenizer::{
+        Language, LowerCaser, SimpleTokenizer, Stemmer, TokenStream, Tokenizer,
+    };
 
     use crate::greek_lower_caser::GreekLowerCaser;
     use crate::tokenizer::NgramTokenizer;
@@ -325,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn test_custom_tokenizer() {
+    fn test_greek_ngram_tokenizer() {
         let text = "Έλα τι λέει";
         let mut tokens = vec![];
         let mut token_stream = NgramTokenizer.filter(GreekLowerCaser).token_stream(text);
@@ -337,6 +339,18 @@ mod tests {
             tokens,
             vec!["ε", "ελ", "ελα", "τ", "τι", "λ", "λε", "λεε", "λεει"]
         );
+    }
+
+    #[test]
+    fn test_english_ngram_tokenizer() {
+        let text = "Whazup";
+        let mut tokens = vec![];
+        let mut token_stream = NgramTokenizer.filter(LowerCaser).token_stream(text);
+        while token_stream.advance() {
+            let token_text = token_stream.token().text.clone();
+            tokens.push(token_text);
+        }
+        assert_eq!(tokens, vec!["w", "wh", "wha", "whaz", "whazu", "whazup"]);
     }
 
     #[test]

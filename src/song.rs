@@ -52,6 +52,9 @@ impl Song {
             }
         };
 
+        // Remove possible year in parentheses at the end of the song_name.
+        let song_name = song_name.split(" (").next().unwrap();
+
         let song_body = strip_metadata(song_body);
         let song_body_greeklish = to_greeklish(song_body.as_str());
 

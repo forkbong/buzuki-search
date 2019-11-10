@@ -11,13 +11,12 @@ use tantivy::Index;
 use tantivy::IndexReader;
 use tantivy::ReloadPolicy;
 
-use lazy_static::lazy_static;
-use log::error;
-use regex::Regex;
 use tempfile::tempdir;
 
 use crate::greek_lower_caser::GreekLowerCaser;
+use crate::song::Song;
 use crate::tokenizer::NgramTokenizer;
+use crate::utils::to_greeklish;
 
 fn get_options(tokenizer: &str) -> TextOptions {
     let text_field_indexing = TextFieldIndexing::default()
@@ -25,74 +24,6 @@ fn get_options(tokenizer: &str) -> TextOptions {
         .set_index_option(IndexRecordOption::WithFreqsAndPositions);
 
     TextOptions::default().set_indexing_options(text_field_indexing)
-}
-
-/// Remove lines that contain only chords and symbols and trim unneeded characters.
-fn strip_metadata(string: &str) -> String {
-    // We are interested in Greek lyrics so we can skip every line that only contains ASCII.
-    lazy_static! {
-        static ref RE: Regex = Regex::new(r"^[[:ascii:]]*$").unwrap();
-    }
-
-    let lines: Vec<&str> = string
-        .split('\n')
-        .filter(|line| !RE.is_match(line))
-        .map(|line| {
-            // Trim any symbols that indicate lyric repetition (e.g. "| 2x")
-            line.trim_end_matches(|c: char| c == ' ' || c == '|' || c.is_ascii_digit() || c == 'x')
-        })
-        .collect();
-
-    // Remove dashes that represent syllable repetition
-    lines.join("\n").chars().filter(|&c| c != '-').collect()
-}
-
-/// Return greek string in greeklish.
-fn to_greeklish(string: &str) -> String {
-    // We always replace spaces with underscores. We don't need that for searching, only for
-    // storing the slug, but it also works for searching so we leave it like that for simplicity.
-    lazy_static! {
-        static ref RE: Regex = Regex::new(r"[^a-z_\n]").unwrap();
-    }
-    string
-        .to_lowercase()
-        .replace("ψ", "ps")
-        .replace("ξ", "ks")
-        .replace("θ", "th")
-        .replace("ου", "ou")
-        .replace("ού", "ou")
-        .replace("αυ", "au")
-        .replace("αύ", "au")
-        .replace("ευ", "eu")
-        .replace("εύ", "eu")
-        .chars()
-        .map(|c| match c {
-            'α' | 'ά' => 'a',
-            'β' => 'v',
-            'γ' => 'g',
-            'δ' => 'd',
-            'ε' | 'έ' => 'e',
-            'ζ' => 'z',
-            'η' | 'ή' => 'i',
-            'ι' | 'ί' | 'ϊ' | 'ΐ' => 'i',
-            'κ' => 'k',
-            'λ' => 'l',
-            'μ' => 'm',
-            'ν' => 'n',
-            'ο' | 'ό' => 'o',
-            'π' => 'p',
-            'ρ' => 'r',
-            'σ' | 'ς' => 's',
-            'τ' => 't',
-            'υ' | 'ύ' => 'y',
-            'φ' => 'f',
-            'χ' => 'x',
-            'ω' | 'ώ' => 'o',
-            ' ' => '_',
-            x => x,
-        })
-        .filter(|&c| !RE.is_match(c.to_string().as_str()))
-        .collect()
 }
 
 #[derive(Clone)]
@@ -172,54 +103,34 @@ impl SearchEngine {
 
         for path in std::fs::read_dir(song_dir).unwrap() {
             let filename = path.unwrap().path();
-
-            let contents = std::fs::read_to_string(filename.clone())?;
-            let mut parts = contents.splitn(4, "\n\n");
-            let head = parts.next().unwrap();
-            let _song_scale = parts.next().unwrap();
-            let _song_rhythm = parts.next().unwrap();
-            let song_body = parts.next().unwrap();
-
-            let head_parts: Vec<&str> = head.split('\n').collect();
-            let (song_name, song_artist) = match head_parts[..] {
-                [song_name, song_artist, _song_url] => (song_name, song_artist),
-                [song_name, song_artist] => (song_name, song_artist),
-                _ => {
-                    error!("Invalid song format");
-                    std::process::exit(1);
-                }
-            };
+            let song = Song::from_path(&filename)?;
 
             // On songs, we tokenize the name and body with both the simple
             // and the stemmed tokenizer. This results in including stemmed
             // results, but giving a higher score to full word results.
-            let song_slug = to_greeklish(song_name);
-            let song_body = strip_metadata(song_body);
-            let song_body_greeklish = to_greeklish(song_body.as_str());
             index_writer.add_document(doc!(
-                name => song_name,
-                slug => song_slug.as_str(),
-                body => song_body.as_str(),
-                body_greeklish => song_body_greeklish.as_str(),
-                ngram_name => song_name,
-                ngram_slug => song_slug.as_str(),
-                ngram_body => song_body.as_str(),
-                ngram_body_greeklish => song_body_greeklish.as_str(),
-                stemmed_name => song_name,
-                stemmed_body => song_body.as_str(),
-                url => format!("/songs/{}/", song_slug),
+                name => song.name.as_str(),
+                slug => song.slug.as_str(),
+                body => song.body.as_str(),
+                body_greeklish => song.body_greeklish.as_str(),
+                ngram_name => song.name.as_str(),
+                ngram_slug => song.slug.as_str(),
+                ngram_body => song.body.as_str(),
+                ngram_body_greeklish => song.body_greeklish.as_str(),
+                stemmed_name => song.name.as_str(),
+                stemmed_body => song.body.as_str(),
+                url => format!("/songs/{}/", song.slug.as_str()),
             ));
 
-            if !indexed_artists.contains(&String::from(song_artist)) {
-                let song_artist_slug = to_greeklish(song_artist);
+            if !indexed_artists.contains(&song.artist) {
                 index_writer.add_document(doc!(
-                    name => song_artist,
-                    slug => song_artist_slug.clone(),
-                    ngram_name => song_artist,
-                    ngram_slug => song_artist_slug.clone(),
-                    url => format!("/artists/{}/", song_artist_slug),
+                    name => song.artist.as_str(),
+                    slug => song.artist_slug.as_str(),
+                    ngram_name => song.artist.as_str(),
+                    ngram_slug => song.artist_slug.as_str(),
+                    url => format!("/artists/{}/", song.artist_slug.as_str()),
                 ));
-                indexed_artists.push(String::from(song_artist));
+                indexed_artists.push(song.artist);
             }
         }
 
@@ -244,10 +155,10 @@ impl SearchEngine {
             let scale_slug = to_greeklish(scale);
             index_writer.add_document(doc!(
                 name => scale,
-                slug => scale_slug.clone(),
+                slug => scale_slug.as_str(),
                 ngram_name => scale,
-                ngram_slug => scale_slug.clone(),
-                url => format!("/scales/{}/", scale_slug),
+                ngram_slug => scale_slug.as_str(),
+                url => format!("/scales/{}/", scale_slug.as_str()),
             ));
         }
 

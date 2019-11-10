@@ -8,7 +8,9 @@ use url::form_urlencoded;
 
 mod greek_lower_caser;
 mod search_engine;
+mod song;
 mod tokenizer;
+mod utils;
 
 use crate::search_engine::SearchEngine;
 

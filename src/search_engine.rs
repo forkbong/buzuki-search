@@ -5,7 +5,7 @@ use tantivy::doc;
 use tantivy::query::QueryParser;
 use tantivy::schema::{IndexRecordOption, Schema, TextFieldIndexing, TextOptions, STORED};
 use tantivy::tokenizer::{
-    Language, LowerCaser, RemoveLongFilter, SimpleTokenizer, Stemmer, Tokenizer,
+    Language, LowerCaser, RemoveLongFilter, SimpleTokenizer, Stemmer, TextAnalyzer,
 };
 use tantivy::Index;
 use tantivy::IndexReader;
@@ -38,23 +38,23 @@ pub struct SearchEngine {
 impl SearchEngine {
     pub fn new(song_dir: &str) -> tantivy::Result<SearchEngine> {
         // Build tokenizers
-        let greek_ngram_tokenizer = NgramTokenizer
+        let greek_ngram_tokenizer = TextAnalyzer::from(NgramTokenizer)
             .filter(RemoveLongFilter::limit(40))
             .filter(GreekLowerCaser);
 
-        let english_ngram_tokenizer = NgramTokenizer
+        let english_ngram_tokenizer = TextAnalyzer::from(NgramTokenizer)
             .filter(RemoveLongFilter::limit(40))
             .filter(LowerCaser);
 
-        let greek_simple_tokenizer = SimpleTokenizer
+        let greek_simple_tokenizer = TextAnalyzer::from(SimpleTokenizer)
             .filter(RemoveLongFilter::limit(40))
             .filter(GreekLowerCaser);
 
-        let english_simple_tokenizer = SimpleTokenizer
+        let english_simple_tokenizer = TextAnalyzer::from(SimpleTokenizer)
             .filter(RemoveLongFilter::limit(40))
             .filter(LowerCaser);
 
-        let greek_stem_tokenizer = SimpleTokenizer
+        let greek_stem_tokenizer = TextAnalyzer::from(SimpleTokenizer)
             .filter(RemoveLongFilter::limit(40))
             .filter(GreekLowerCaser)
             .filter(Stemmer::new(Language::Greek));
@@ -218,9 +218,7 @@ impl SearchEngine {
 
 #[cfg(test)]
 mod tests {
-    use tantivy::tokenizer::{
-        Language, LowerCaser, SimpleTokenizer, Stemmer, TokenStream, Tokenizer,
-    };
+    use tantivy::tokenizer::{Language, LowerCaser, SimpleTokenizer, Stemmer, TextAnalyzer};
 
     use crate::greek_lower_caser::GreekLowerCaser;
     use crate::tokenizer::NgramTokenizer;
@@ -229,7 +227,9 @@ mod tests {
     fn test_simple_tokenizer() {
         let text = "Έλα τι λέει";
         let mut tokens = vec![];
-        let mut token_stream = SimpleTokenizer.filter(GreekLowerCaser).token_stream(text);
+        let mut token_stream = TextAnalyzer::from(SimpleTokenizer)
+            .filter(GreekLowerCaser)
+            .token_stream(text);
         while token_stream.advance() {
             let token_text = token_stream.token().text.clone();
             tokens.push(token_text);
@@ -241,7 +241,9 @@ mod tests {
     fn test_greek_ngram_tokenizer() {
         let text = "Έλα τι λέει";
         let mut tokens = vec![];
-        let mut token_stream = NgramTokenizer.filter(GreekLowerCaser).token_stream(text);
+        let mut token_stream = TextAnalyzer::from(NgramTokenizer)
+            .filter(GreekLowerCaser)
+            .token_stream(text);
         while token_stream.advance() {
             let token_text = token_stream.token().text.clone();
             tokens.push(token_text);
@@ -256,7 +258,9 @@ mod tests {
     fn test_english_ngram_tokenizer() {
         let text = "Whazup";
         let mut tokens = vec![];
-        let mut token_stream = NgramTokenizer.filter(LowerCaser).token_stream(text);
+        let mut token_stream = TextAnalyzer::from(NgramTokenizer)
+            .filter(LowerCaser)
+            .token_stream(text);
         while token_stream.advance() {
             let token_text = token_stream.token().text.clone();
             tokens.push(token_text);
@@ -268,7 +272,7 @@ mod tests {
     fn test_greek_stemmer_tokenizer() {
         let text = "Εφουμέρναμε ένα βράδυ";
         let mut tokens = vec![];
-        let mut token_stream = SimpleTokenizer
+        let mut token_stream = TextAnalyzer::from(SimpleTokenizer)
             .filter(Stemmer::new(Language::Greek))
             .token_stream(text);
         while token_stream.advance() {

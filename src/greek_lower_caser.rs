@@ -1,25 +1,24 @@
 use std::mem;
 
+use tantivy::tokenizer::BoxTokenStream;
 use tantivy::tokenizer::{Token, TokenFilter, TokenStream};
+
+impl TokenFilter for GreekLowerCaser {
+    fn transform<'a>(&self, token_stream: BoxTokenStream<'a>) -> BoxTokenStream<'a> {
+        BoxTokenStream::from(GreekLowerCaserTokenStream {
+            tail: token_stream,
+            buffer: String::with_capacity(100),
+        })
+    }
+}
 
 /// Token filter that lowercase terms.
 #[derive(Clone)]
 pub struct GreekLowerCaser;
 
-impl<TailTokenStream> TokenFilter<TailTokenStream> for GreekLowerCaser
-where
-    TailTokenStream: TokenStream,
-{
-    type ResultTokenStream = GreekLowerCaserTokenStream<TailTokenStream>;
-
-    fn transform(&self, token_stream: TailTokenStream) -> Self::ResultTokenStream {
-        GreekLowerCaserTokenStream::wrap(token_stream)
-    }
-}
-
-pub struct GreekLowerCaserTokenStream<TailTokenStream> {
+pub struct GreekLowerCaserTokenStream<'a> {
     buffer: String,
-    tail: TailTokenStream,
+    tail: BoxTokenStream<'a>,
 }
 
 /// Writes a lowercased version of text into output.
@@ -46,43 +45,26 @@ fn to_greek_lowercase_unicode(text: &mut String, output: &mut String) {
     }
 }
 
-impl<TailTokenStream> TokenStream for GreekLowerCaserTokenStream<TailTokenStream>
-where
-    TailTokenStream: TokenStream,
-{
+impl<'a> TokenStream for GreekLowerCaserTokenStream<'a> {
+    fn advance(&mut self) -> bool {
+        if !self.tail.advance() {
+            return false;
+        }
+        if self.token_mut().text.is_ascii() {
+            // fast track for ascii.
+            self.token_mut().text.make_ascii_lowercase();
+        } else {
+            to_greek_lowercase_unicode(&mut self.tail.token_mut().text, &mut self.buffer);
+            mem::swap(&mut self.tail.token_mut().text, &mut self.buffer);
+        }
+        true
+    }
+
     fn token(&self) -> &Token {
         self.tail.token()
     }
 
     fn token_mut(&mut self) -> &mut Token {
         self.tail.token_mut()
-    }
-
-    fn advance(&mut self) -> bool {
-        if self.tail.advance() {
-            if self.token_mut().text.is_ascii() {
-                // fast track for ascii.
-                self.token_mut().text.make_ascii_lowercase();
-            } else {
-                to_greek_lowercase_unicode(&mut self.tail.token_mut().text, &mut self.buffer);
-
-                mem::swap(&mut self.tail.token_mut().text, &mut self.buffer);
-            }
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl<TailTokenStream> GreekLowerCaserTokenStream<TailTokenStream>
-where
-    TailTokenStream: TokenStream,
-{
-    fn wrap(tail: TailTokenStream) -> GreekLowerCaserTokenStream<TailTokenStream> {
-        GreekLowerCaserTokenStream {
-            tail,
-            buffer: String::with_capacity(100),
-        }
     }
 }

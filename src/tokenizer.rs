@@ -1,6 +1,6 @@
 use std::str::CharIndices;
 
-use tantivy::tokenizer::{Token, TokenStream, Tokenizer};
+use tantivy::tokenizer::{BoxTokenStream, Token, TokenStream, Tokenizer};
 
 /// Tokenize the text by splitting on whitespace and punctuation and finding all ngrams for each
 /// word. Based on the built-in tantivy SimpleTokenizer.
@@ -17,11 +17,9 @@ pub struct SimpleTokenStream<'a> {
     last: bool,
 }
 
-impl<'a> Tokenizer<'a> for NgramTokenizer {
-    type TokenStreamImpl = SimpleTokenStream<'a>;
-
-    fn token_stream(&self, text: &'a str) -> Self::TokenStreamImpl {
-        SimpleTokenStream {
+impl Tokenizer for NgramTokenizer {
+    fn token_stream<'a>(&self, text: &'a str) -> BoxTokenStream<'a> {
+        BoxTokenStream::from(SimpleTokenStream {
             text: text.trim(),
             chars: text.char_indices(),
             token: Token::default(),
@@ -29,7 +27,7 @@ impl<'a> Tokenizer<'a> for NgramTokenizer {
             offset_from: 0,
             first: true,
             last: false,
-        }
+        })
     }
 }
 

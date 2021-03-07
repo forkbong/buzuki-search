@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::convert::Infallible;
+use std::net::SocketAddr;
 
-use futures::{future, Future};
-use hyper::service::service_fn;
-use hyper::{header, Body, Method, Request, Response, Server, StatusCode};
+use hyper::service::{make_service_fn, service_fn};
+use hyper::Server;
+use hyper::{header, Body, Method, Request, Response, StatusCode};
 use log::{error, info, warn};
 use url::form_urlencoded;
 
@@ -14,22 +16,17 @@ mod utils;
 
 use crate::search_engine::SearchEngine;
 
-fn service(
-    request: &Request<Body>,
-    search_engine: &SearchEngine,
-) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
-    fn get_json_response(
-        status: StatusCode,
-        body: Body,
-    ) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
-        Box::new(future::ok(
-            Response::builder()
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-                .status(status)
-                .body(body)
-                .unwrap(),
-        ))
+async fn buzuki(
+    request: Request<Body>,
+    search_engine: SearchEngine,
+) -> Result<Response<Body>, hyper::Error> {
+    fn get_json_response(status: StatusCode, body: Body) -> Result<Response<Body>, hyper::Error> {
+        Ok(Response::builder()
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+            .status(status)
+            .body(body)
+            .unwrap())
     }
 
     fn search(
@@ -74,31 +71,6 @@ fn service(
     }
 }
 
-fn serve(search_engine: SearchEngine) {
-    let addr = "127.0.0.1:1337".parse().unwrap();
-
-    hyper::rt::run(future::lazy(move || {
-        let new_service = move || {
-            let search_engine = search_engine.clone();
-            service_fn(move |request| service(&request, &search_engine))
-        };
-
-        let server = match Server::try_bind(&addr) {
-            Ok(builder) => builder
-                .serve(new_service)
-                .map_err(|e| error!("server error: {}", e)),
-            Err(e) => {
-                error!("Couldn't bind to {}: {}", addr, e);
-                std::process::exit(1);
-            }
-        };
-
-        info!("Listening on http://{}", addr);
-
-        server
-    }));
-}
-
 /// Initialize env_logger to use info level by default.
 fn init_logger() {
     let env = env_logger::Env::default().default_filter_or("info");
@@ -106,7 +78,8 @@ fn init_logger() {
     builder.init();
 }
 
-fn main() -> tantivy::Result<()> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_logger();
 
     let key = "BUZUKI_SONGDIR";
@@ -120,7 +93,22 @@ fn main() -> tantivy::Result<()> {
 
     let search_engine = SearchEngine::new(&songdir)?;
 
-    serve(search_engine);
+    let addr = SocketAddr::from(([127, 0, 0, 1], 1337));
+
+    let make_service = make_service_fn(move |_| {
+        let search_engine = search_engine.clone();
+        async move {
+            Ok::<_, Infallible>(service_fn(move |request| {
+                buzuki(request, search_engine.clone())
+            }))
+        }
+    });
+
+    let server = Server::bind(&addr).serve(make_service);
+
+    info!("Listening on http://{}", addr);
+
+    server.await?;
 
     Ok(())
 }

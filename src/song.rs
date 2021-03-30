@@ -34,8 +34,8 @@ pub struct Song {
 }
 
 impl Song {
-    pub fn from_path(path: &std::path::PathBuf) -> tantivy::Result<Song> {
-        let contents = std::fs::read_to_string(path.clone())?;
+    pub fn from_path(path: &std::path::Path) -> tantivy::Result<Song> {
+        let contents = std::fs::read_to_string(path)?;
         let mut parts = contents.splitn(4, "\n\n");
         let head = parts.next().unwrap();
         let _song_scale = parts.next().unwrap();
@@ -109,7 +109,7 @@ mod tests {
         );
         file.write_all(file_content.as_bytes()).unwrap();
 
-        let song = Song::from_path(&file.path().to_path_buf()).unwrap();
+        let song = Song::from_path(&file.path()).unwrap();
 
         assert_eq!(song.name, "Τα μπλε παράθυρά σου");
         assert_eq!(song.slug, "ta_mple_parathyra_sou");

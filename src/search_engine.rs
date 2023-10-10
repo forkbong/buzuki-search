@@ -107,7 +107,7 @@ impl SearchEngine {
             // On songs, we tokenize the name and body with both the simple
             // and the stemmed tokenizer. This results in including stemmed
             // results, but giving a higher score to full word results.
-            index_writer.add_document(doc!(
+            let _ = index_writer.add_document(doc!(
                 name => song.name.as_str(),
                 slug => song.slug.as_str(),
                 body => song.body.as_str(),
@@ -122,7 +122,7 @@ impl SearchEngine {
             ));
 
             if !indexed_artists.contains(&song.artist) {
-                index_writer.add_document(doc!(
+                let _ = index_writer.add_document(doc!(
                     name => song.artist.as_str(),
                     slug => song.artist_slug.as_str(),
                     ngram_name => song.artist.as_str(),
@@ -152,7 +152,7 @@ impl SearchEngine {
             "Κιουρντί",
         ] {
             let scale_slug = to_greeklish(scale);
-            index_writer.add_document(doc!(
+            let _ = index_writer.add_document(doc!(
                 name => scale,
                 slug => scale_slug.as_str(),
                 ngram_name => scale,
@@ -205,7 +205,7 @@ impl SearchEngine {
             let mut entry = HashMap::new();
             for field_value in retrieved_doc.field_values() {
                 let field_name = self.schema.get_field_name(field_value.field());
-                let value = field_value.value().text().unwrap();
+                let value = field_value.value().as_text().unwrap();
                 entry.insert(field_name.to_string(), value.to_string());
             }
             results.push(entry);

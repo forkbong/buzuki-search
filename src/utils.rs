@@ -10,9 +10,9 @@ pub fn to_greeklish(string: &str) -> String {
     }
     string
         .to_lowercase()
-        .replace("ψ", "ps")
-        .replace("ξ", "ks")
-        .replace("θ", "th")
+        .replace('ψ', "ps")
+        .replace('ξ', "ks")
+        .replace('θ', "th")
         .replace("ου", "ou")
         .replace("ού", "ou")
         .replace("αυ", "au")

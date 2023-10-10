@@ -22,7 +22,7 @@ pub struct GreekLowerCaserTokenStream<'a> {
 }
 
 /// Writes a lowercased version of text into output.
-fn to_greek_lowercase_unicode(text: &mut String, output: &mut String) {
+fn to_greek_lowercase_unicode(text: &mut str, output: &mut String) {
     output.clear();
     for c in text.chars() {
         for c in c.to_lowercase() {

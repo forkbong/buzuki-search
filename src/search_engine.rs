@@ -28,7 +28,6 @@ fn get_options(tokenizer: &str) -> TextOptions {
 
 #[derive(Clone)]
 pub struct SearchEngine {
-    index: Index,
     reader: IndexReader,
     full_query_parser: QueryParser,
     ngram_query_parser: QueryParser,
@@ -184,7 +183,6 @@ impl SearchEngine {
         let schema = index.schema();
 
         Ok(SearchEngine {
-            index,
             reader,
             full_query_parser,
             ngram_query_parser,
